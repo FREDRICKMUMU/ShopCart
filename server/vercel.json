@@ -1,15 +1,15 @@
 {
   "version": 2,
   "functions": {
-    "server.ts": {
+    "server/server.ts": {
       "runtime": "@vercel/node",
-      "includeFiles": "dist/**"
+      "includeFiles": "server/dist/**"
     }
   },
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "server.ts"
+      "dest": "server/server.ts"
     }
   ]
 }
