@@ -1,0 +1,48 @@
+import { Request, Response, NextFunction } from "express";
+import jwt from 'jsonwebtoken';
+import { prisma } from "../config/prisma.js";
+
+interface AuthRequest extends Request {
+    partner?: {
+        id: string;
+        isActive: boolean | null;
+        name?: string | null;
+        email?: string | null;
+        phone?: string | null;
+        vehicleType?: string | null;
+    }
+}
+
+const deliveryAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer")) {
+            return res.status(401).json({ message: "No token provided" });
+        }
+
+        const token = authHeader.split(" ")[1];
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string, role: string };
+
+        if (decoded.role !== "delivery") {
+            return res.status(403).json({ message: "Access denied. Delivery partner only." });
+        }
+
+        const partner = await prisma.deliveryPartner.findUnique({
+            where: { id: decoded.id }
+        });
+
+        if (!partner || !partner.isActive) {
+            return res.status(403).json({ message: "Account is deactivated" });
+        }
+        
+        req.partner = partner;
+        next();
+
+    } catch (err) {
+        console.log(err);
+        return res.status(401).json({ message: "Token is not valid" });
+    }
+}
+
+export default deliveryAuth;
