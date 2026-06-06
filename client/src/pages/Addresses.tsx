@@ -25,7 +25,7 @@ const Addresses = () => {
 
   const onEditHandler = (addr: Address) => {
     setForm({ label: addr.label, address: addr.address, city: addr.city, state: addr.state, zip: addr.zip, isDefault: addr.isDefault })
-    setEditingId(addr._id)
+    setEditingId(addr.id)
     setShowForm(true)
   }
 
@@ -64,7 +64,7 @@ const Addresses = () => {
         ) : (
           <div className="space-y-4">
             {addresses.map((addr) => (
-              <AddressCard key={addr._id} addr={addr} onEditHandler={onEditHandler} setAddresses={setAddresses} />
+              <AddressCard key={addr.id} addr={addr} onEditHandler={onEditHandler} setAddresses={setAddresses} />
             ))}
           </div>
         )}

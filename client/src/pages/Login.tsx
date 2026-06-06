@@ -2,6 +2,7 @@ import { useState } from "react"
 import { heroSectionData } from "../assets/assets"
 import { Link } from "react-router-dom"
 import { ShoppingCart, User, Mail, Lock, Loader2 } from 'lucide-react'
+import { useAuth } from "../context/AuthContext"
 
 const Login = () => {
   const [isLoginState, setIsLoginState] = useState(true)
@@ -10,10 +11,23 @@ const Login = () => {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const {login, register} = useAuth()
+
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setTimeout(() => window.location.href = "/", 1000)
+    setLoading(true);
+    try{
+      if(isLoginState){
+        await login(email, password)
+      }else {
+        await register(name, email, password)
+      }
+
+    } catch(error: any){
+       toast.error(error.response?.data?.message || error?.message);
+    } finally{
+      setLoading(false)
+    }
   }
 
   return (

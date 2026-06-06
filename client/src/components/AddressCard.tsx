@@ -23,7 +23,7 @@ const AddressCard = ({ addr, onEditHandler }: AddressCardProps) => {
           <div className="flex items-center gap-2 mb-1">
             <p className="text-sm font-semibold text-app-green">{addr.label}</p>
             {addr.isDefault && (
-              <span className="flex-center gap-1 px-2.5 py-0.5 text-[10px] font-medium bg-app-green text-white rounded-full">
+              <span className="items-center gap-1 px-2.5 py-0.5 text-[10px] font-medium bg-app-green text-white rounded-full">
                 <CheckIcon className="size-2.5" />
                 Default
               </span>
@@ -42,7 +42,7 @@ const AddressCard = ({ addr, onEditHandler }: AddressCardProps) => {
         </button>
 
         <button
-          onClick={() => handleDelete(addr._id)}
+          onClick={() => handleDelete(addr.id)}
           className="p-2 text-app-text-light hover:text-app-error hover:bg-red-50 rounded-lg transition-colors">
           <Trash2Icon className="size-4" />
         </button>
