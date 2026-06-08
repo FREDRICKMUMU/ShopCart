@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import type { Product } from "../types";
-import { dummyProducts } from "../assets/assets";
 import { ArrowLeftIcon, ArrowRightIcon, HomeIcon, MinusIcon, PlusIcon, ShoppingCartIcon, LeafIcon, StarIcon } from "lucide-react";
 import DummyReviewsSection from "../assets/DummyReviewsSection";
 import ProductCard from "../components/ProductCard";
 import { useCart } from "../context/CartContext";
+import api from "../config/api";
 
 const ProductPage = () => {
   const currency = import.meta.env.VITE_CURRENCY_SYMBOL || "$";
@@ -22,10 +22,14 @@ const ProductPage = () => {
     setLoading(true)
     setLocalQuantity(1);
     window.scrollTo(0, 0)
-    const foundProduct = dummyProducts.find((p) => p.id === id)
-    setProduct(foundProduct!)
-    setRelatedProducts(dummyProducts.filter((p) => p.id !== id))
-    setLoading(false)
+
+    api.get(`/products/${id}`).then(({ data }) => {
+      setProduct(data.product);
+      return api.get(`/products?category=${data.product.category}`)
+    }).then(({ data }) => {
+      setRelatedProducts(data.products.filter((p: Product) => p.id !== id))
+    }).catch(() => navigate("/products")).finally(() => setLoading(false))
+    
   }, [id])
 
   if (loading) return <div>Loading...</div>

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { PackageIcon, UsersIcon, ShoppingBagIcon, AlertTriangleIcon } from "lucide-react";
 import Loading from "../../components/Loading";
-import { dummyAdminDashboardData, statusColors } from "../../assets/assets";
+import { statusColors } from "../../assets/assets";
+import api from "../../config/api";
 
 interface Stats {
     totalOrders: number;
@@ -20,10 +21,10 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        setTimeout(() => {
-            setStats(dummyAdminDashboardData);
-            setLoading(false);
-        }, 1000);
+        api.get("/admin/stats")
+            .then((res) => setStats(res.data))
+            .catch(() => { })
+            .finally(() => setLoading(false))
     }, []);
 
     const cards = stats
@@ -47,7 +48,7 @@ export default function AdminDashboard() {
                             <p className="text-2xl font-semibold text-zinc-900">{card.value}</p>
                             <p className="text-sm text-app-text-light">{card.label}</p>
                         </div>
-                        <div className={`size-10 rounded-xl flex-center bg-orange-50 text-orange-600`}>
+                        <div className="size-10 rounded-xl flex-center bg-orange-50 text-orange-600">
                             <card.icon className="size-5" />
                         </div>
                     </div>

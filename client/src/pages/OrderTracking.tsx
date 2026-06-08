@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom"
 import LiveMap from "../components/OrderTracking/LiveMap";
 import OrderTimeLine from "../components/OrderTracking/OrderTimeLine";
-import { dummyDashboardOrdersData } from "../assets/assets";
 import type { Order } from "../types";
+import api from "../config/api";
 
 const OrderTracking = () => {
   const currency = import.meta.env.VITE_CURRENCY_SYMBOL || "KSH";
@@ -12,16 +12,41 @@ const OrderTracking = () => {
   const navigate = useNavigate()
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
-  const [mapError, ] = useState(false)
+  const [mapError] = useState(false)
+  const [liveLocation, setLiveLocation] = useState<{ lat: number; lng: number } | null>(null)
 
   useEffect(() => {
-    const foundOrder = dummyDashboardOrdersData.find((o) => o.id === id)
-    setOrder(foundOrder as any)
-    setLoading(false)
-  }, [id])
+    api.get(`/orders/${id}`).then((res) => setOrder(res.data.order)).catch(() =>
+      navigate("/orders")).finally(() => setLoading(false))
+  }, [id, navigate])
 
-  if (loading) return <div className="flex-center py-16">Loading...</div>
-  if (!order) return <div className="flex-center py-16">Order not found</div>
+  // LIVE LOCATION EVERY 10 SECS
+  useEffect(() => {
+    if (!order || ["Delivered", "Cancelled", "Placed"].includes(order.status)) return;
+
+    const fetchLocation = async () => {
+      try {
+        const { data } = await api.get(`/orders/${id}/location`)
+        if (data.liveLocation?.lat && data.liveLocation?.lng && data.liveLocation.updatedAt) {
+          setLiveLocation({
+            lat: data.liveLocation.lat,
+            lng: data.liveLocation.lng
+          })
+        }
+        // ALSO UPDATE ORDER STATUS IF IT CHANGED
+        if (data.status && data.status !== order.status) {
+          setOrder((prev) => prev ? { ...prev, status: data.status } : prev)
+        }
+      } catch { }
+    }
+    
+    fetchLocation()
+    const interval = setInterval(fetchLocation, 10000)
+    return () => clearInterval(interval)
+  }, [id, order?.status])
+
+  if (loading) return <div>Loading...</div>
+  if (!order) return null
 
   return (
     <div className="min-h-screen mb-20 bg-app-cream">
@@ -30,7 +55,7 @@ const OrderTracking = () => {
         <button onClick={() => navigate("/orders")} className="flex items-center gap-2 text-sm text-app-text-light hover:text-app-green mb-6 transition-colors">
           <ArrowLeftIcon className="size-4" /> Back to Orders
         </button>
-        
+
         {/* ORDER ID, DATE, STATUS */}
         <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
           <div>
@@ -44,7 +69,7 @@ const OrderTracking = () => {
           </span>
         </div>
       </div>
-      
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         <div className="grid lg:grid-cols-3 gap-6">
           {/* LEFT SIDE - TIMELINE + MAP AREA */}
@@ -52,17 +77,17 @@ const OrderTracking = () => {
             {/* LIVE TRACKING MAP */}
             {!mapError ? (
               <div className="bg-white rounded-2xl overflow-hidden">
-                <LiveMap order={order} liveLocation={null} />
+                <LiveMap order={order} liveLocation={liveLocation} />
               </div>
             ) : (
               <div className="bg-white rounded-2xl p-10 text-center">
                 <p className="text-app-text-light">Map is currently unavailable</p>
               </div>
             )}
-            
+
             {/* PROGRESS TIMELINE */}
             <OrderTimeLine order={order} />
-            
+
             {/* DELIVERY PARTNER */}
             {order?.deliveryPartner && order.status !== "Delivered" && order.status !== "Cancelled" && (
               <div className="bg-white rounded-2xl p-5 flex items-center justify-between">

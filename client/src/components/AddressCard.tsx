@@ -1,15 +1,30 @@
 import { CheckIcon, MapPinIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import type { Address } from "../types";
+import { useAuth } from "../context/AuthContext";
+import api from "../config/api";
+import toast from "react-hot-toast";
 
 interface AddressCardProps {
   addr: Address;
   onEditHandler: (addr: Address) => void
+  setAddresses?: (addresses: Address[]) => void;
 }
 
-const AddressCard = ({ addr, onEditHandler }: AddressCardProps) => {
+const AddressCard = ({ addr, onEditHandler, setAddresses }: AddressCardProps) => {
 
+  const { updateUser } = useAuth()
+  
   const handleDelete = async (id: string) => {
-    console.log(id)
+    try {
+      const confirm = window.confirm("Are you sure you want to delete this address ?");
+      if (!confirm) return;
+      const { data } = await api.delete(`/addresses/${id}`);
+      if (setAddresses) setAddresses(data.addresses);
+      updateUser({ addresses: data.addresses })
+      toast.success('Address removed')
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error?.message);
+    }
   }
 
   return (
@@ -23,7 +38,7 @@ const AddressCard = ({ addr, onEditHandler }: AddressCardProps) => {
           <div className="flex items-center gap-2 mb-1">
             <p className="text-sm font-semibold text-app-green">{addr.label}</p>
             {addr.isDefault && (
-              <span className="items-center gap-1 px-2.5 py-0.5 text-[10px] font-medium bg-app-green text-white rounded-full">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-medium bg-app-green text-white rounded-full">
                 <CheckIcon className="size-2.5" />
                 Default
               </span>

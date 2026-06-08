@@ -1,11 +1,15 @@
 import type { Address } from "../types"
 import { useEffect, useState } from "react"
-import { dummyAddressData } from "../assets/assets"
 import AddressCard from "../components/AddressCard"
 import AddressForm from "../components/AddressForm"
 import { PlusIcon, MapPinIcon } from "lucide-react"
+import { useAuth } from "../context/AuthContext"
+import toast from "react-hot-toast"
+import api from "../config/api"
 
 const Addresses = () => {
+
+  const { updateUser } = useAuth()
 
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loading, setLoading] = useState(true)
@@ -19,10 +23,68 @@ const Addresses = () => {
     setEditingId(null)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const getLocation = (retries = 3): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("Geolocation not supported"))
+        return;
+      }
+      const attempt = () => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            })
+          },
+          (error: any) => {
+            if (retries > 0) {
+              retries--;
+              setTimeout(attempt, 1000)
+            } else {
+              reject(new Error(error.message || "Failed to get location after retries"))
+            }
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 15000,
+            maximumAge: 60000,
+          }
+        )
+      };
+      attempt()
+    })
   }
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
 
+  try {
+    // Try to get location, fall back to Nairobi coords if denied
+    let coords = { lat: -1.2921, lng: 36.8219 }
+    try {
+      coords = await getLocation()
+    } catch {
+      // Location denied or unavailable — use default
+    }
+
+    const payload = { ...form, ...coords }
+
+    if (editingId) {
+      const { data } = await api.put(`/addresses/${editingId}`, payload)
+      setAddresses(data.addresses)
+      updateUser({ addresses: data.addresses })
+      toast.success("Address updated!")
+    } else {
+      const { data } = await api.post(`/addresses`, payload)
+      setAddresses(data.addresses)
+      updateUser({ addresses: data.addresses })
+      toast.success("Address added!")
+    }
+    resetForm()
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || error.message || "Failed")
+  }
+}
   const onEditHandler = (addr: Address) => {
     setForm({ label: addr.label, address: addr.address, city: addr.city, state: addr.state, zip: addr.zip, isDefault: addr.isDefault })
     setEditingId(addr.id)
@@ -30,8 +92,19 @@ const Addresses = () => {
   }
 
   useEffect(() => {
-    setAddresses(dummyAddressData)
-    setTimeout(() => setLoading(false), 1000)
+    const fetchAddresses = async () => {
+      api.get('/addresses')
+        .then(({ data }) => {
+          setAddresses(data.addresses)
+        })
+        .catch((error: any) => {
+          toast.error(error.response?.data?.message || error?.message)
+        })
+        .finally(() => {
+          setLoading(false)
+        })
+    }
+    fetchAddresses()
   }, [])
 
   if (loading) return <div className="flex-center py-16">Loading...</div>

@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { PlusIcon, XIcon, TruckIcon, PhoneIcon, MailIcon } from "lucide-react";
 import type { DeliveryPartner } from "../../types";
 import Loading from "../../components/Loading";
-import { dummyDeliveryPartnerData } from "../../assets/assets";
+import toast from "react-hot-toast";
+import api from "../../config/api";
 
 export default function AdminDeliveryPartners() {
     const [partners, setPartners] = useState<DeliveryPartner[]>([]);
@@ -12,21 +13,49 @@ export default function AdminDeliveryPartners() {
     const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", vehicleType: "bike" });
 
     const fetchPartners = async () => {
-        setPartners(dummyDeliveryPartnerData as any)
-        setTimeout(() => setLoading(false), 1000)
+        try {
+            const { data } = await api.get("/admin/delivery-partners");
+            setPartners(data.partners);
+        } catch (error: any) {
+            toast.error(error?.response?.data?.message || "Failed");
+        } finally {
+            setLoading(false)
+        }
     };
 
     useEffect(() => {
         fetchPartners();
     }, []);
 
-    const handleSubmit = async (e: React.SubmitEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
+        setSaving(true)
+        try {
+            await api.post("/admin/delivery-partners", form);
+            toast.success("Partner onboarded successfully");
+            setShowForm(false);
+            setForm({ name: "", email: "", password: "", phone: "", vehicleType: "bike" });
+            fetchPartners();
+        } catch (error: any) {
+            toast.error(error?.response?.data?.message || "Failed");
+        } finally {
+            setSaving(false)
+        }
     };
 
     const toggleActive = async (id: string, isActive: boolean) => {
-        console.log(id, isActive);
+        try{
+            await api.put(`/admin/delivery-partners/${id}`,
+                {isActive: !isActive});
+                toast.success(isActive ? "Partner deactivated" : 
+                    "Partner activated");
+                    fetchPartners();
+
+        } catch (error: any){
+        toast.error(error?.response?.data?.message || "Failed");
+
+
+        }
     };
 
     if (loading) return <Loading />;

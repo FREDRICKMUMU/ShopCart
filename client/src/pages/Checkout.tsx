@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRightIcon } from "lucide-react";
 import { useCart } from "../context/CartContext";
-import { dummyAddressData } from "../assets/assets";
-import { CheckIcon, ChevronRightIcon, CreditCardIcon, MapPinIcon } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { CheckIcon, CreditCardIcon, MapPinIcon } from "lucide-react";
 import CheckoutAddress from "../components/Checkout/CheckoutAddress";
 import CheckoutPayment from "../components/Checkout/CheckoutPayment";
 import CheckoutReview from "../components/Checkout/CheckoutReview";
+import toast from "react-hot-toast";
+import api from "../config/api";
 
 const Checkout = () => {
   const navigate = useNavigate()
   const currency = import.meta.env.VITE_CURRENCY_SYMBOL || 'KSH';
 
-  const { items, cartTotal } = useCart()
-  const user = { addresses: dummyAddressData }
+  const { items, cartTotal, clearCart } = useCart()
+  const { user } = useAuth()
 
   const [step, setStep] = useState("address")
   const [loading, setLoading] = useState(false)
@@ -44,7 +46,33 @@ const Checkout = () => {
 
   const handlePlaceOrder = async () => {
     setLoading(true)
-    navigate("/orders")
+    try {
+      const orderData = {
+        items: items.map((item) => ({
+          product: item.product.id,
+          quantity: item.quantity,
+        })),
+        shippingAddress: address,
+        paymentMethod
+      }
+      const { data } = await api.post('/orders', orderData)
+      console.log(data)
+
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      clearCart()
+      toast.success("Order placed successfully!");
+      navigate(`/orders/${data.order.id}`)
+
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error.message);
+    } finally {
+      setLoading(false);
+      window.scrollTo(0, 0);
+    }
   }
 
   useEffect(() => {
@@ -70,7 +98,7 @@ const Checkout = () => {
         <div className="text-center">
           <h2 className="text-xl font-semibold text-app-green mb-2">Your cart is empty</h2>
           <p className="text-sm text-app-text-light mb-4">Add some products to checkout</p>
-          <button 
+          <button
             onClick={() => navigate("/products")}
             className="px-5 py-2.5 bg-app-green text-white text-sm font-medium rounded-xl hover:bg-app-green-light transition-colors">
             Browse Products
@@ -84,14 +112,14 @@ const Checkout = () => {
     <div className="min-h-screen bg-app-cream">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* BACK BUTTON */}
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-sm text-app-text-light hover:text-app-green mb-6 transition-colors">
           <ArrowLeft className="size-4" /> Back
         </button>
 
         <h1 className="text-2xl font-semibold text-app-green mb-8">Checkout</h1>
-      
+
         {/* STEPS */}
         <div className="flex items-center gap-2 mb-8">
           {steps.map((s, i) => (
@@ -122,7 +150,7 @@ const Checkout = () => {
           {/* ORDER SUMMARY SIDEBAR */}
           <div className="bg-white rounded-2xl p-5 h-fit sticky top-24">
             <h3 className="text-sm font-semibold text-app-green mb-4">Order Summary</h3>
-          
+
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Subtotal ({items.length} items)</span>
