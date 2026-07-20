@@ -20,20 +20,19 @@ const OrderTracking = () => {
       navigate("/orders")).finally(() => setLoading(false))
   }, [id, navigate])
 
-  // LIVE LOCATION EVERY 10 SECS
+  // LIVE LOCATION EVERY 8 SECS for in-progress deliveries
   useEffect(() => {
-    if (!order || ["Delivered", "Cancelled", "Placed"].includes(order.status)) return;
+    if (!order || ["Delivered", "Cancelled"].includes(order.status)) return;
 
     const fetchLocation = async () => {
       try {
         const { data } = await api.get(`/orders/${id}/location`)
-        if (data.liveLocation?.lat && data.liveLocation?.lng && data.liveLocation.updatedAt) {
+        if (data.liveLocation?.lat && data.liveLocation?.lng) {
           setLiveLocation({
             lat: data.liveLocation.lat,
             lng: data.liveLocation.lng
           })
         }
-        // ALSO UPDATE ORDER STATUS IF IT CHANGED
         if (data.status && data.status !== order.status) {
           setOrder((prev) => prev ? { ...prev, status: data.status } : prev)
         }
@@ -41,12 +40,27 @@ const OrderTracking = () => {
     }
     
     fetchLocation()
-    const interval = setInterval(fetchLocation, 10000)
+    const interval = setInterval(fetchLocation, 8000)
     return () => clearInterval(interval)
   }, [id, order?.status])
 
   if (loading) return <div>Loading...</div>
-  if (!order) return null
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-app-cream flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-app-green mb-2">Order not found</h2>
+          <p className="text-sm text-app-text-light mb-4">This order may have been removed or you don't have access.</p>
+          <button
+            onClick={() => navigate("/orders")}
+            className="px-5 py-2.5 bg-app-green text-white text-sm font-medium rounded-xl hover:bg-app-green-light transition-colors"
+          >
+            Back to Orders
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen mb-20 bg-app-cream">
@@ -120,9 +134,7 @@ const OrderTracking = () => {
               <p className="text-sm text-app-text-light leading-relaxed">
                 {order?.shippingAddress?.label || "Home"}
                 <br />
-                {order?.shippingAddress?.address || "123 Main St"}
-                <br />
-                {order?.shippingAddress?.city || "Nairobi"}, {order?.shippingAddress?.state || "Nairobi"}, {order?.shippingAddress?.zip || "00100"}
+                {order?.shippingAddress?.address || "Address unavailable"}
               </p>
             </div>
 

@@ -7,9 +7,10 @@ interface CheckoutReviewProps {
     handlePlaceOrder: () => void;
     loading: boolean;
     total: number;
+    orderPlaced?: boolean;
 }
 
-export default function CheckoutReview({ address, items, handlePlaceOrder, loading, total }: CheckoutReviewProps) {
+export default function CheckoutReview({ address, items, handlePlaceOrder, loading, total, orderPlaced = false }: CheckoutReviewProps) {
 
     const currency = import.meta.env.VITE_CURRENCY_SYMBOL || "$";
 
@@ -26,7 +27,7 @@ export default function CheckoutReview({ address, items, handlePlaceOrder, loadi
                     <span className="text-sm font-semibold text-app-green">Delivery Address</span>
                 </div>
                 <p className="text-sm text-app-text-light">
-                    {address.label} — {address.address}, {address.city}, {address.state} {address.zip}
+                    {address.label} — {address.address}
                 </p>
             </div>
 
@@ -44,9 +45,11 @@ export default function CheckoutReview({ address, items, handlePlaceOrder, loadi
                 ))}
             </div>
 
-            <button onClick={handlePlaceOrder} disabled={loading} className="w-full py-3 bg-app-orange text-white font-semibold rounded-xl hover:bg-app-orange-dark transition-colors disabled:opacity-60 active:scale-[0.98]">
-                {loading ? "Placing Order..." : `Place Order — ${currency}${total.toFixed(2)}`}
-            </button>
+            {!orderPlaced && (
+                <button onClick={handlePlaceOrder} disabled={loading} className="w-full py-3 bg-app-orange text-white font-semibold rounded-xl hover:bg-app-orange-dark transition-colors disabled:opacity-60 active:scale-[0.98]">
+                    {loading ? "Placing Order..." : `Place Order — ${currency}${total.toFixed(2)}`}
+                </button>
+            )}
         </div>
     )
 }

@@ -44,7 +44,12 @@ const AddressCard = ({ addr, onEditHandler, setAddresses }: AddressCardProps) =>
               </span>
             )}
           </div>
-          <p className="text-sm text-app-text-light">{addr.address}, {addr.city}, <br /> {addr.state}, {addr.zip}</p>
+          <p className="text-sm text-app-text-light">{addr.address}</p>
+          {(addr.lat !== 0 || addr.lng !== 0) && (
+            <p className="text-xs text-app-text-light mt-1">
+              GPS: {addr.lat.toFixed(4)}, {addr.lng.toFixed(4)}
+            </p>
+          )}
         </div>
       </div>
 

@@ -30,6 +30,8 @@ export default function DeliveryDashboard() {
     const [cancelModal, setCancelModal] = useState<string | null>(null);
     const [cancelReason, setCancelReason] = useState("");
     const watchIdRef = useRef<number | null>(null)
+    const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+    const simPosRef = useRef<{ lat: number; lng: number } | null>(null)
 
     const fetchOrders = async () => {
         setLoading(true);
@@ -47,35 +49,101 @@ export default function DeliveryDashboard() {
         fetchOrders();
     }, [tab]);
 
-    // SEND LOCATION EVERY 10 SECS OF ACTIVE DELIVERIES
+    // Auto-enable tracking when there are active deliveries
     useEffect(() => {
-        const activeOrders = orders.filter((o) => ["Assigned", "Packed", "Out for Delivery"].includes(o.status));
+        const activeOrders = orders.filter((o) =>
+            ["Assigned", "Packed", "Out for Delivery"].includes(o.status)
+        );
+        if (activeOrders.length > 0 && tab === "active") {
+            setTracking(true);
+        }
+    }, [orders, tab]);
+
+    const pushLocation = async (orderIds: string[], lat: number, lng: number) => {
+        await Promise.all(
+            orderIds.map((id) =>
+                axios
+                    .put(`${API_URL}/delivery/my-deliveries/${id}/location`, { lat, lng }, getAuthHeaders())
+                    .catch(() => null)
+            )
+        );
+    };
+
+    // SEND LOCATION OF ACTIVE DELIVERIES
+    useEffect(() => {
+        const activeOrders = orders.filter((o) =>
+            ["Assigned", "Packed", "Out for Delivery"].includes(o.status)
+        );
+        const orderIds = activeOrders.map((o) => o.id);
 
         if (activeOrders.length === 0 || !tracking) {
             if (watchIdRef.current !== null) {
                 navigator.geolocation.clearWatch(watchIdRef.current);
                 watchIdRef.current = null;
             }
+            if (simIntervalRef.current) {
+                clearInterval(simIntervalRef.current);
+                simIntervalRef.current = null;
+            }
             return;
         }
 
+        const startSimulation = () => {
+            if (simIntervalRef.current) return;
+
+            const dest = activeOrders[0]?.shippingAddress;
+            const startLat = dest?.lat || -1.286389;
+            const startLng = dest?.lng || 36.817223;
+            // Start ~1km away so the map movement is visible
+            if (!simPosRef.current) {
+                simPosRef.current = {
+                    lat: startLat + 0.008,
+                    lng: startLng - 0.006,
+                };
+            }
+
+            toast("GPS unavailable — simulating location for local tracking", { icon: "🛰️" });
+
+            simIntervalRef.current = setInterval(() => {
+                if (!simPosRef.current) return;
+                const targetLat = dest?.lat || startLat;
+                const targetLng = dest?.lng || startLng;
+                simPosRef.current = {
+                    lat: simPosRef.current.lat + (targetLat - simPosRef.current.lat) * 0.15,
+                    lng: simPosRef.current.lng + (targetLng - simPosRef.current.lng) * 0.15,
+                };
+                pushLocation(orderIds, simPosRef.current.lat, simPosRef.current.lng);
+            }, 5000);
+        };
+
         const sendLocation = (pos: GeolocationPosition) => {
+            if (simIntervalRef.current) {
+                clearInterval(simIntervalRef.current);
+                simIntervalRef.current = null;
+            }
             const { latitude: lat, longitude: lng } = pos.coords;
-            activeOrders.forEach((order) => {
-                axios.put(`${API_URL}/delivery/my-deliveries/${order.id}/location`, { lat, lng }, getAuthHeaders())
-                    .catch(() => {})
-            });
+            pushLocation(orderIds, lat, lng);
+        };
+
+        if (!navigator.geolocation) {
+            startSimulation();
+            return () => {
+                if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+            };
         }
 
-        watchIdRef.current = navigator.geolocation.watchPosition(sendLocation, () => {}, {
-            enableHighAccuracy: true,
-            maximumAge: 10000,
-        })
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            sendLocation,
+            () => startSimulation(),
+            { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+        );
 
-        // ALSO SEND ON INTERVAL FOR MORE CONSISTENT UPDATES
         const interval = setInterval(() => {
-            navigator.geolocation.getCurrentPosition(sendLocation, () => {}, { enableHighAccuracy: true })
-        }, 10000)
+            navigator.geolocation.getCurrentPosition(sendLocation, () => startSimulation(), {
+                enableHighAccuracy: true,
+                timeout: 8000,
+            });
+        }, 10000);
 
         return () => {
             if (watchIdRef.current !== null) {
@@ -83,6 +151,10 @@ export default function DeliveryDashboard() {
                 watchIdRef.current = null;
             }
             clearInterval(interval)
+            if (simIntervalRef.current) {
+                clearInterval(simIntervalRef.current);
+                simIntervalRef.current = null;
+            }
         }
     }, [orders, tracking]);
 
@@ -128,6 +200,15 @@ export default function DeliveryDashboard() {
         }
     }
 
+    const toggleTracking = () => {
+        setTracking((prev) => {
+            const next = !prev;
+            if (next) toast.success("Location sharing on");
+            else toast("Location sharing off");
+            return next;
+        });
+    };
+
     return (
         <div className="space-y-6">
             {/* Tabs + Tracking toggle */}
@@ -138,7 +219,7 @@ export default function DeliveryDashboard() {
                     </button>
                 ))}
                 <div className="ml-auto">
-                    <button onClick={() => setTracking((prev) => !prev)} className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors flex items-center gap-1.5 ${tracking ? "bg-green-600 text-white" : "bg-white text-zinc-600 border border-app-border hover:bg-app-cream"}`}>
+                    <button onClick={toggleTracking} className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors flex items-center gap-1.5 ${tracking ? "bg-green-600 text-white" : "bg-white text-zinc-600 border border-app-border hover:bg-app-cream"}`}>
                         <NavigationIcon className={`w-3.5 h-3.5 ${tracking ? "animate-pulse" : ""}`} />
                         {tracking ? "Sharing Location" : "Share Location"}
                     </button>

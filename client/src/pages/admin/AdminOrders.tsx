@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TruckIcon } from "lucide-react";
+import { TruckIcon, NavigationIcon, MapPinIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import type { DeliveryPartner } from "../../types";
 import Loading from "../../components/Loading";
@@ -14,6 +14,8 @@ export default function AdminOrders() {
     const [loading, setLoading] = useState(true);
     const [assignModal, setAssignModal] = useState<string | null>(null);
     const [selectedPartner, setSelectedPartner] = useState("");
+    const [trackModal, setTrackModal] = useState<any | null>(null);
+    const [liveLocation, setLiveLocation] = useState<{ lat: number; lng: number } | null>(null);
 
     const fetchOrders = async () => {
         try {
@@ -39,6 +41,29 @@ export default function AdminOrders() {
         fetchOrders();
         fetchPartners();
     }, []);
+
+    // Poll live location while tracking modal is open
+    useEffect(() => {
+        if (!trackModal) {
+            setLiveLocation(null);
+            return;
+        }
+
+        const poll = async () => {
+            try {
+                const { data } = await api.get(`/orders/${trackModal.id}/location`);
+                if (data.liveLocation?.lat && data.liveLocation?.lng) {
+                    setLiveLocation({ lat: data.liveLocation.lat, lng: data.liveLocation.lng });
+                }
+            } catch {
+                // ignore transient errors
+            }
+        };
+
+        poll();
+        const interval = setInterval(poll, 8000);
+        return () => clearInterval(interval);
+    }, [trackModal]);
 
     const handleStatusChange = async (id: string, newStatus: string) => {
         try {
@@ -90,13 +115,14 @@ export default function AdminOrders() {
                                 <th className="px-6 py-4">Customer</th>
                                 <th className="px-6 py-4">Total</th>
                                 <th className="px-6 py-4">Delivery Partner</th>
+                                <th className="px-6 py-4">GPS</th>
                                 <th className="px-6 py-4">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-app-border">
                             {orders.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-zinc-500">No orders found.</td>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-zinc-500">No orders found.</td>
                                 </tr>
                             ) : (
                                 orders.map((order: any) => (
@@ -126,6 +152,14 @@ export default function AdminOrders() {
                                                     <TruckIcon className="size-3" /> Assign
                                                 </button>
                                             )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <button
+                                                onClick={() => setTrackModal(order)}
+                                                className="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors flex items-center gap-1"
+                                            >
+                                                <NavigationIcon className="size-3" /> Track
+                                            </button>
                                         </td>
                                         <td className="px-6 py-4">
                                             <select
@@ -173,6 +207,55 @@ export default function AdminOrders() {
                                 <button onClick={() => setAssignModal(null)} className="flex-1 py-2.5 text-sm font-medium text-zinc-600 bg-zinc-100 rounded-xl hover:bg-zinc-200 transition-colors">Cancel</button>
                                 <button onClick={handleAssign} disabled={!selectedPartner} className="flex-1 py-2.5 text-sm font-medium text-white bg-app-green rounded-xl hover:bg-app-green-light transition-colors disabled:opacity-50">Assign</button>
                             </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* GPS Track Modal */}
+            {trackModal && (
+                <>
+                    <div className="fixed inset-0 bg-app-cream/80 backdrop-blur z-50" onClick={() => setTrackModal(null)} />
+                    <div className="fixed inset-0 z-50 flex-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-fade-in">
+                            <h3 className="text-lg font-semibold text-app-green mb-1">Live GPS — #{trackModal.id.slice(-6)}</h3>
+                            <p className="text-xs text-zinc-500 mb-4">Updates automatically while the partner is sharing location</p>
+
+                            <div className="space-y-3 text-sm">
+                                <div className="p-3 rounded-xl bg-app-cream flex items-start gap-2">
+                                    <MapPinIcon className="size-4 text-app-green mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="font-medium text-zinc-900">Destination</p>
+                                        <p className="text-zinc-600">{trackModal.shippingAddress?.address || "—"}</p>
+                                        {trackModal.shippingAddress?.lat != null && (
+                                            <p className="text-xs text-zinc-500 mt-1">
+                                                {Number(trackModal.shippingAddress.lat).toFixed(5)}, {Number(trackModal.shippingAddress.lng).toFixed(5)}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="p-3 rounded-xl border border-app-border flex items-start gap-2">
+                                    <NavigationIcon className={`size-4 text-green-600 mt-0.5 shrink-0 ${liveLocation ? "animate-pulse" : ""}`} />
+                                    <div>
+                                        <p className="font-medium text-zinc-900">Partner location</p>
+                                        {liveLocation ? (
+                                            <p className="text-zinc-600">
+                                                {liveLocation.lat.toFixed(5)}, {liveLocation.lng.toFixed(5)}
+                                            </p>
+                                        ) : (
+                                            <p className="text-zinc-500">Waiting for partner to share GPS…</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setTrackModal(null)}
+                                className="mt-5 w-full py-2.5 text-sm font-medium text-zinc-600 bg-zinc-100 rounded-xl hover:bg-zinc-200 transition-colors"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </>

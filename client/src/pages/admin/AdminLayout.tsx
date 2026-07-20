@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function AdminLayout() {
 
-    const {user} = useAuth()
+    const {user, loading} = useAuth()
 
 
     const AdminLinkData = [
@@ -16,6 +16,10 @@ export default function AdminLayout() {
         { to: "/admin/delivery-partners", label: "Delivery Partners", icon: Truck },
         { to: "/", label: "Exit", icon: LogOutIcon },
     ]
+
+    if (loading) {
+        return <div className="flex-center min-h-screen text-app-text-light">Loading...</div>
+    }
 
     if(!user?.isAdmin){
         return <Navigate to='/' replace />

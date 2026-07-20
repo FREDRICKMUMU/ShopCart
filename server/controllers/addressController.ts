@@ -47,9 +47,9 @@ export const addAddress = async (req: AuthRequest, res: Response) => {
             userId: req.user!.id,
             label,
             address,
-            city,
-            state,
-            zip,
+            city: city || "Local",
+            state: state || "Local",
+            zip: zip || "00000",
             isDefault: makeDefault,
             lat: Number(lat),
             lng: Number(lng)

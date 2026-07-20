@@ -11,23 +11,27 @@ interface AuthRequest extends Request {
 
 // GET ADMIN DASHBOARD DATA
 export const getAdminStats = async (req: AuthRequest, res: Response) => {
-    const [totalOrders, totalUsers, totalProducts, outOfStock, totalPartners, recentOrders] = await Promise.all([
-        prisma.order.count({ where: { NOT: [{ paymentMethod: "card", isPaid: false }] } }),
-        prisma.user.count(),
-        prisma.product.count(),
-        prisma.product.count({ where: { stock: 0 } }),
-        prisma.deliveryPartner.count(),
-        prisma.order.findMany({
-            where: { NOT: [{ paymentMethod: "card", isPaid: false }] },
-            orderBy: { createdAt: "desc" },
-            take: 8,
-            include: {
-                user: { select: { name: true, email: true } },
-                deliveryPartner: { select: { name: true, phone: true } }
-            }
-        })
-    ]);
-    res.json({ totalOrders, totalUsers, totalProducts, outOfStock, totalPartners, recentOrders });
+    try {
+        const [totalOrders, totalUsers, totalProducts, outOfStock, totalPartners, recentOrders] = await Promise.all([
+            prisma.order.count(),
+            prisma.user.count(),
+            prisma.product.count(),
+            prisma.product.count({ where: { stock: 0 } }),
+            prisma.deliveryPartner.count(),
+            prisma.order.findMany({
+                orderBy: { createdAt: "desc" },
+                take: 8,
+                include: {
+                    user: { select: { name: true, email: true } },
+                    deliveryPartner: { select: { name: true, phone: true } }
+                }
+            })
+        ]);
+        res.json({ totalOrders, totalUsers, totalProducts, outOfStock, totalPartners, recentOrders });
+    } catch (error: any) {
+        console.error("getAdminStats failed:", error);
+        res.status(500).json({ message: error.message || "Failed to load admin stats" });
+    }
 }
 
 // GET DELIVERY PARTNERS LIST FOR ADMIN
@@ -68,7 +72,7 @@ export const updateDeliveryPartner = async (req: AuthRequest, res: Response) => 
     if (name) data.name = name;
     if (phone) data.phone = phone;
     if (vehicleType) data.vehicleType = vehicleType;
-    data.isActive = isActive;
+    if (typeof isActive === "boolean") data.isActive = isActive;
 
     try {
         const partner = await prisma.deliveryPartner.update({

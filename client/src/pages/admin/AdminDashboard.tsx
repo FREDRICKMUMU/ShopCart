@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { PackageIcon, UsersIcon, ShoppingBagIcon, AlertTriangleIcon } from "lucide-react";
+import toast from "react-hot-toast";
 import Loading from "../../components/Loading";
 import { statusColors } from "../../assets/assets";
 import api from "../../config/api";
@@ -23,7 +24,9 @@ export default function AdminDashboard() {
     useEffect(() => {
         api.get("/admin/stats")
             .then((res) => setStats(res.data))
-            .catch(() => { })
+            .catch((error: any) => {
+                toast.error(error.response?.data?.message || "Failed to load dashboard");
+            })
             .finally(() => setLoading(false))
     }, []);
 
@@ -35,6 +38,8 @@ export default function AdminDashboard() {
             { label: "Out of Stock", value: stats.outOfStock, icon: AlertTriangleIcon },
         ]
         : [];
+
+    const recentOrders = stats?.recentOrders ?? [];
 
     if (loading) return <Loading />
 
@@ -76,20 +81,22 @@ export default function AdminDashboard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-app-border">
-                            {stats?.recentOrders.length === 0 ? (
+                            {recentOrders.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-8 text-center text-zinc-500">No orders yet.</td>
+                                    <td colSpan={6} className="px-6 py-8 text-center text-zinc-500">
+                                        {stats ? "No orders yet." : "Could not load orders. Check admin access and try refreshing."}
+                                    </td>
                                 </tr>
                             ) : (
-                                stats?.recentOrders.map((order: any) => (
+                                recentOrders.map((order: any) => (
                                     <tr key={order.id} className="hover:bg-zinc-50/50 transition-colors">
                                         <td className="px-6 py-4 font-mono text-xs text-zinc-500">#{order.id.slice(-6).toUpperCase()}</td>
                                         <td className="px-6 py-4">
                                             <p className="font-medium text-zinc-900">{order.user?.name || "—"}</p>
                                             <p className="text-xs text-zinc-500">{order.user?.email || ""}</p>
                                         </td>
-                                        <td className="px-6 py-4 text-zinc-600">{order.items?.length || 0} items</td>
-                                        <td className="px-6 py-4 font-medium">{currency}{order.total?.toFixed(2)}</td>
+                                        <td className="px-6 py-4 text-zinc-600">{Array.isArray(order.items) ? order.items.length : 0} items</td>
+                                        <td className="px-6 py-4 font-medium">{currency}{Number(order.total || 0).toFixed(2)}</td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[order.status] || "bg-zinc-100 text-zinc-600"}`}>
                                                 {order.status}

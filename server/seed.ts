@@ -1,11 +1,18 @@
 import 'dotenv/config'
 import { prisma } from './config/prisma.js'
+import bcrypt from 'bcrypt'
 
 const seedDB = async () => {
     try {
+        // ===== CLEAR EXISTING DATA =====
         await prisma.product.deleteMany({});
         console.log("Cleared existing products");
 
+        // Delete existing users if you want fresh admin (optional)
+        // await prisma.user.deleteMany({});
+        // console.log("Cleared existing users");
+
+        // ===== SEED PRODUCTS =====
         const products = [
             {
                 name: "Butter Croissant 100g",
@@ -361,10 +368,38 @@ const seedDB = async () => {
         ];
 
         await prisma.product.createMany({ data: products });
-        console.log(`Created ${products.length} products successfully!`);
+        console.log(`✅ Created ${products.length} products successfully!`);
+
+        // ===== CREATE ADMIN USER =====
+        const adminEmail = 'admin@example.com';
+        const adminPassword = 'admin123'; // ← CHANGE THIS TO YOUR DESIRED PASSWORD
+
+        // Check if admin already exists
+        const existingAdmin = await prisma.user.findUnique({
+            where: { email: adminEmail }
+        });
+
+        if (!existingAdmin) {
+            const hashedPassword = await bcrypt.hash(adminPassword, 10);
+            
+            await prisma.user.create({
+                data: {
+                    name: 'Admin User',
+                    email: adminEmail,
+                    password: hashedPassword,
+                    isAdmin: true,
+                    phone: '0712345678',
+                }
+            });
+            console.log(`✅ Admin user created: ${adminEmail} / ${adminPassword}`);
+        } else {
+            console.log(`ℹ️ Admin user already exists: ${adminEmail}`);
+        }
+
+        console.log('🎉 Seeding completed successfully!');
 
     } catch (error) {
-        console.error("Seed error:", error);
+        console.error("❌ Seed error:", error);
         process.exit(1);
     } finally {
         await prisma.$disconnect();

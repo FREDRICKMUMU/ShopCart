@@ -22,8 +22,11 @@ const AppPromoBanner = () => {
         </div>
 
         {/* RIGHT SIDE */}
-        <img src={assets.delivery_truck} alt="Delivery Truck" className="
-        max-w-60 sm:max-w-120 xl:pr-10" />
+        <img
+          src={assets.delivery_truck}
+          alt="Delivery Truck"
+          className="max-w-60 sm:max-w-120 xl:pr-10 object-contain"
+        />
       </div>
     </section>
   )

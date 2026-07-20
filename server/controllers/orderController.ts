@@ -65,9 +65,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
             }
         });
 
-        if (paymentMethod === "card") {
-            // STRIPE PAYMENT LINK
-        }
+      
 
         for (const item of orderItems) {
             await prisma.product.update({
@@ -76,11 +74,15 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
             });
         }
 
-        // SEND STOCK UPDATE EVENTS FOR EACH PRODUCT IN THE ORDER
-        for (const item of orderItems) {
-            await inngest.send({ name: "inventory/stock.updated", data: { productId: item.product } });
+        // Background jobs should not fail the order response
+        try {
+            for (const item of orderItems) {
+                await inngest.send({ name: "inventory/stock.updated", data: { productId: item.product } });
+            }
+            await inngest.send({ name: "order/placed", data: { orderId: order.id } });
+        } catch (err) {
+            console.error("Inngest notify failed after order create:", err);
         }
-        await inngest.send({ name: "order/placed", data: { orderId: order.id } });
 
         res.json({ order });
     } catch (error: any) {
@@ -96,11 +98,22 @@ export const getUserOrders = async (req: AuthRequest, res: Response) => {
 
         const where: any = {
             userId: req.user!.id,
-            NOT: [{ paymentMethod: "card", isPaid: false }]
         };
 
+        // Only hide abandoned online checkouts older than nothing — show pending payments so My Orders updates immediately
+        // Unpaid online orders are still listed with their Placed status until payment confirms
+
         if (status && status !== "all") {
-            where.status = status;
+            // Accept friendly tab labels from the client
+            const statusMap: Record<string, string> = {
+                placed: "Placed",
+                "out of delivery": "Out for Delivery",
+                "out for delivery": "Out for Delivery",
+                delivered: "Delivered",
+                cancelled: "Cancelled",
+            };
+            const key = String(status).toLowerCase();
+            where.status = statusMap[key] || status;
         }
 
         const orders = await prisma.order.findMany({
@@ -172,7 +185,6 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 export const getAllOrders = async (req: Request, res: Response) => {
     try {
         const orders = await prisma.order.findMany({
-            where: { NOT: [{ paymentMethod: "card", isPaid: false }] },
             include: {
                 user: { select: { name: true, email: true } },
                 deliveryPartner: { select: { name: true, phone: true, email: true } }
@@ -185,17 +197,38 @@ export const getAllOrders = async (req: Request, res: Response) => {
     }
 }
 
-// GET ORDER LOCATION
+// GET ORDER LOCATION (customer own order, or admin any order)
 // GET /api/orders/:id/location
 export const getOrderLocation = async (req: AuthRequest, res: Response) => {
     try {
-        const order = await prisma.order.findFirst({
-            where: { id: req.params.id as string, userId: req.user!.id },
-            select: { liveLocation: true, status: true }
+        const order = await prisma.order.findUnique({
+            where: { id: req.params.id as string },
+            select: {
+                userId: true,
+                liveLocation: true,
+                status: true,
+                shippingAddress: true,
+            }
         });
 
         if (!order) return res.status(404).json({ message: "Order not found" });
-        res.json({ liveLocation: order.liveLocation, status: order.status });
+
+        if (order.userId !== req.user!.id) {
+            const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+            const adminEmails = process.env.ADMIN_EMAILS
+                ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim().toLowerCase())
+                : [];
+            const isAdmin = !!user && adminEmails.includes(user.email.toLowerCase());
+            if (!isAdmin) {
+                return res.status(403).json({ message: "Not authorized" });
+            }
+        }
+
+        res.json({
+            liveLocation: order.liveLocation,
+            status: order.status,
+            shippingAddress: order.shippingAddress,
+        });
     } catch (error: any) {
         res.status(500).json({ message: error.message });
     }

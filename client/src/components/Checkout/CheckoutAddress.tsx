@@ -15,11 +15,13 @@ const CheckoutAddress = ({ user, address, setAddress, setStep }: any) => {
                             <div
                                 key={addr.id || addr.label}
                                 onClick={() => setAddress({
+                                    id: addr.id,
                                     label: addr.label,
                                     address: addr.address,
-                                    city: addr.city,
-                                    state: addr.state,
-                                    zip: addr.zip,
+                                    city: addr.city || "",
+                                    state: addr.state || "",
+                                    zip: addr.zip || "",
+                                    isDefault: addr.isDefault,
                                     lat: addr.lat,
                                     lng: addr.lng,
                                 })}
@@ -37,7 +39,6 @@ const CheckoutAddress = ({ user, address, setAddress, setStep }: any) => {
                                     )}
                                 </div>
                                 <p className="text-sm text-zinc-600 truncate">{addr.address}</p>
-                                <p className="text-xs text-zinc-500">{addr.city}, {addr.state} {addr.zip}</p>
                             </div>
                         ))}
                     </div>
@@ -49,11 +50,11 @@ const CheckoutAddress = ({ user, address, setAddress, setStep }: any) => {
                 Add New Address <PlusIcon className="size-4" />
             </Link>
             <button
-                onClick={() => { setStep("payment"); scrollTo(0, 0) }}
-                disabled={!address.address || !address.city}
+                onClick={() => { setStep("review"); scrollTo(0, 0) }}
+                disabled={!address.address}
                 className="mt-6 px-6 py-3 bg-app-green text-white font-semibold rounded-xl
                 hover:bg-app-green-light transition-colors disabled:opacity-50 flex items-center gap-2">
-                Continue to Payment <ChevronRightIcon className="size-4" />
+                Continue to Review <ChevronRightIcon className="size-4" />
             </button>
         </div>
     )

@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom"
 import { ArrowLeft, ChevronRightIcon } from "lucide-react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
-import { CheckIcon, CreditCardIcon, MapPinIcon } from "lucide-react";
+import { CheckIcon, MapPinIcon } from "lucide-react";
 import CheckoutAddress from "../components/Checkout/CheckoutAddress";
-import CheckoutPayment from "../components/Checkout/CheckoutPayment";
 import CheckoutReview from "../components/Checkout/CheckoutReview";
 import toast from "react-hot-toast";
 import api from "../config/api";
+import PesapalPayment from '../components/PesapalPayment'
 
 const Checkout = () => {
   const navigate = useNavigate()
@@ -18,7 +18,10 @@ const Checkout = () => {
   const { user } = useAuth()
 
   const [step, setStep] = useState("address")
-  const [loading, setLoading] = useState(false)
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [placing, setPlacing] = useState(false)
+  const [placedItems, setPlacedItems] = useState<typeof items>([])
+  const [placedSubtotal, setPlacedSubtotal] = useState(0)
 
   const [address, setAddress] = useState({
     id: "",
@@ -32,46 +35,52 @@ const Checkout = () => {
     lng: 0,
   })
 
-  const [paymentMethod, setPaymentMethod] = useState('card')
-
-  const deliveryFee = cartTotal > 20 ? 0 : 1.99;
-  const tax = cartTotal * 0.08;
-  const total = cartTotal + deliveryFee + tax;
+  const displayItems = orderId ? placedItems : items
+  const displaySubtotal = orderId ? placedSubtotal : cartTotal
+  const deliveryFee = displaySubtotal > 20 ? 0 : 1.99
+  const tax = displaySubtotal * 0.08
+  const total = displaySubtotal + deliveryFee + tax
 
   const steps: { key: string; label: string; icon: any }[] = [
     { key: "address", label: "Address", icon: MapPinIcon },
-    { key: "payment", label: "Payment", icon: CreditCardIcon },
     { key: "review", label: "Review", icon: CheckIcon },
   ]
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('cancel') === 'true') {
+      toast.error('Payment was cancelled');
+    }
+  }, []);
+
   const handlePlaceOrder = async () => {
-    setLoading(true)
+    setPlacing(true)
     try {
       const orderData = {
         items: items.map((item) => ({
           product: item.product.id,
           quantity: item.quantity,
         })),
-        shippingAddress: address,
-        paymentMethod
+        shippingAddress: {
+          ...address,
+          city: address.city || "Local",
+          state: address.state || "Local",
+          zip: address.zip || "00000",
+        },
+        paymentMethod: "pesapal",
       }
+      const snapshotItems = [...items]
+      const snapshotSubtotal = cartTotal
       const { data } = await api.post('/orders', orderData)
-      console.log(data)
-
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-
+      setPlacedItems(snapshotItems)
+      setPlacedSubtotal(snapshotSubtotal)
+      setOrderId(data.order.id)
       clearCart()
-      toast.success("Order placed successfully!");
-      navigate(`/orders/${data.order.id}`)
-
+      toast.success('Order created — complete payment to confirm')
     } catch (error: any) {
       toast.error(error.response?.data?.message || error.message);
     } finally {
-      setLoading(false);
-      window.scrollTo(0, 0);
+      setPlacing(false)
     }
   }
 
@@ -92,9 +101,9 @@ const Checkout = () => {
     }
   }, [user])
 
-  if (items.length === 0) {
+  if (items.length === 0 && !orderId) {
     return (
-      <div className="min-h-screen bg-app-cream flex-center">
+      <div className="min-h-screen bg-app-cream flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-app-green mb-2">Your cart is empty</h2>
           <p className="text-sm text-app-text-light mb-4">Add some products to checkout</p>
@@ -111,7 +120,6 @@ const Checkout = () => {
   return (
     <div className="min-h-screen bg-app-cream">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* BACK BUTTON */}
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-sm text-app-text-light hover:text-app-green mb-6 transition-colors">
@@ -120,12 +128,11 @@ const Checkout = () => {
 
         <h1 className="text-2xl font-semibold text-app-green mb-8">Checkout</h1>
 
-        {/* STEPS */}
         <div className="flex items-center gap-2 mb-8">
           {steps.map((s, i) => (
             <div key={s.key} className="flex items-center gap-2">
               <button
-                onClick={() => setStep(s.key)}
+                onClick={() => !orderId && setStep(s.key)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${step === s.key ? "bg-app-green text-white" : "bg-white text-app-text-light"}`}>
                 <s.icon className="size-4" /> {s.label}
               </button>
@@ -135,32 +142,56 @@ const Checkout = () => {
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">
-          {/* MAIN FORM */}
           <div className="md:col-span-2">
-            {step === "address" && <CheckoutAddress address={address} setAddress={setAddress}
-              setStep={setStep} user={user} />}
+            {step === "address" && (
+              <CheckoutAddress
+                address={address}
+                setAddress={setAddress}
+                setStep={setStep}
+                user={user}
+              />
+            )}
 
-            {step === "payment" && <CheckoutPayment paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod}
-              setStep={setStep} />}
-
-            {step === "review" && <CheckoutReview address={address} items={items}
-              handlePlaceOrder={handlePlaceOrder} loading={loading} total={total} />}
+            {step === "review" && (
+              <div>
+                <CheckoutReview
+                  address={address}
+                  items={displayItems}
+                  total={total}
+                  handlePlaceOrder={handlePlaceOrder}
+                  loading={placing}
+                  orderPlaced={!!orderId}
+                />
+                <div className="mt-6">
+                  {orderId ? (
+                    <PesapalPayment
+                      amount={total}
+                      orderId={orderId}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* ORDER SUMMARY SIDEBAR */}
           <div className="bg-white rounded-2xl p-5 h-fit sticky top-24">
             <h3 className="text-sm font-semibold text-app-green mb-4">Order Summary</h3>
 
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span>Subtotal ({items.length} items)</span>
-                <span>{currency}{cartTotal.toFixed(2)}</span>
+                <span>Subtotal ({displayItems.length} items)</span>
+                <span>{currency}{displaySubtotal.toFixed(2)}</span>
               </div>
 
               <div className="flex justify-between">
                 <span className="text-app-text-light">Delivery</span>
-                <span>{deliveryFee === 0 ? <span className="text-app-success">Free</span>
-                  : `${currency}${deliveryFee.toFixed(2)}`}</span>
+                <span>
+                  {deliveryFee === 0 ? (
+                    <span className="text-app-success">Free</span>
+                  ) : (
+                    `${currency}${deliveryFee.toFixed(2)}`
+                  )}
+                </span>
               </div>
 
               <div className="flex justify-between">

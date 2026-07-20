@@ -15,15 +15,24 @@ const Addresses = () => {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ label: "", address: "", city: "", state: "", zip: "", isDefault: false })
+  const [form, setForm] = useState({
+    label: "",
+    address: "",
+    city: "",
+    state: "",
+    zip: "",
+    isDefault: false,
+    lat: 0,
+    lng: 0,
+  })
 
   const resetForm = () => {
-    setForm({ label: "", address: "", city: "", state: "", zip: "", isDefault: false })
+    setForm({ label: "", address: "", city: "", state: "", zip: "", isDefault: false, lat: 0, lng: 0 })
     setShowForm(false)
     setEditingId(null)
   }
 
-  const getLocation = (retries = 3): Promise<{ lat: number; lng: number }> => {
+  const getLocation = (retries = 2): Promise<{ lat: number; lng: number }> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error("Geolocation not supported"))
@@ -40,53 +49,76 @@ const Addresses = () => {
           (error: any) => {
             if (retries > 0) {
               retries--;
-              setTimeout(attempt, 1000)
+              setTimeout(attempt, 800)
             } else {
-              reject(new Error(error.message || "Failed to get location after retries"))
+              reject(new Error(error.message || "Failed to get location"))
             }
           },
           {
-            enableHighAccuracy: false,
-            timeout: 15000,
-            maximumAge: 60000,
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 0,
           }
         )
       };
       attempt()
     })
   }
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
 
-  try {
-    // Try to get location, fall back to Nairobi coords if denied
-    let coords = { lat: -1.2921, lng: 36.8219 }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
     try {
-      coords = await getLocation()
-    } catch {
-      // Location denied or unavailable — use default
-    }
+      let coords = { lat: form.lat, lng: form.lng }
 
-    const payload = { ...form, ...coords }
+      if (!coords.lat || !coords.lng) {
+        try {
+          coords = await getLocation()
+        } catch {
+          // Local default so address + map tracking still work without GPS
+          coords = { lat: -1.286389, lng: 36.817223 }
+          toast("Using local default coordinates — enable GPS for accurate tracking", { icon: "📍" })
+        }
+      }
 
-    if (editingId) {
-      const { data } = await api.put(`/addresses/${editingId}`, payload)
-      setAddresses(data.addresses)
-      updateUser({ addresses: data.addresses })
-      toast.success("Address updated!")
-    } else {
-      const { data } = await api.post(`/addresses`, payload)
-      setAddresses(data.addresses)
-      updateUser({ addresses: data.addresses })
-      toast.success("Address added!")
+      const payload = {
+        label: form.label,
+        address: form.address,
+        city: form.city || "Local",
+        state: form.state || "Local",
+        zip: form.zip || "00000",
+        isDefault: form.isDefault,
+        ...coords,
+      }
+
+      if (editingId) {
+        const { data } = await api.put(`/addresses/${editingId}`, payload)
+        setAddresses(data.addresses)
+        updateUser({ addresses: data.addresses })
+        toast.success("Address updated!")
+      } else {
+        const { data } = await api.post(`/addresses`, payload)
+        setAddresses(data.addresses)
+        updateUser({ addresses: data.addresses })
+        toast.success("Address added!")
+      }
+      resetForm()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error.message || "Failed")
     }
-    resetForm()
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || error.message || "Failed")
   }
-}
+
   const onEditHandler = (addr: Address) => {
-    setForm({ label: addr.label, address: addr.address, city: addr.city, state: addr.state, zip: addr.zip, isDefault: addr.isDefault })
+    setForm({
+      label: addr.label,
+      address: addr.address,
+      city: addr.city || "",
+      state: addr.state || "",
+      zip: addr.zip || "",
+      isDefault: addr.isDefault,
+      lat: addr.lat || 0,
+      lng: addr.lng || 0,
+    })
     setEditingId(addr.id)
     setShowForm(true)
   }
