@@ -11,7 +11,9 @@ const paymentRouter = express.Router()
 
 paymentRouter.post('/initialize', auth, initializePayment)
 paymentRouter.post('/verify', auth, verifyPayment)
-paymentRouter.get('/webhook', handleWebhook)
+paymentRouter.route('/webhook')
+  .get(handleWebhook)
+  .post(handleWebhook)
 paymentRouter.post('/register-ipn', registerIPN)
 
 export default paymentRouter
