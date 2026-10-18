@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import type { User, ReactNode } from "../types";
+import type { User } from "../types";
 import api from "../config/api";
 import toast from "react-hot-toast";
 
@@ -44,7 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem("auth_user", JSON.stringify(data.user))
             toast.success("Login successful")
             navigate('/')
-
         } catch (error: any) {
             toast.error(error?.response?.data?.message || error?.message)
         }
@@ -59,7 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem("auth_user", JSON.stringify(data.user))
             toast.success("Registration successful")
             navigate('/')
-
         } catch (error: any) {
             toast.error(error?.response?.data?.message || error?.message)
         }

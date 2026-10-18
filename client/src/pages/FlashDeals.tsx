@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import ProductCard from "../components/ProductCard"
 import { Zap } from "lucide-react"
+import type { Product } from '../types'
+
 import api from "../config/api";
 import toast from "react-hot-toast";
 
@@ -9,8 +11,10 @@ const FlashDeals = () => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-   api.get("/products/flash-deals").then((res)=>setProducts(res.data.products)).catch(()=> toast.error(error.response.data.message || error?.message))
-   .finally(()=>setLoading(false))
+    api.get("/products/flash-deals")
+      .then((res) => setProducts(res.data.products))
+      .catch((error: any) => toast.error(error?.response?.data?.message || error?.message))
+      .finally(() => setLoading(false))
   }, [])
 
   return (
@@ -47,4 +51,4 @@ const FlashDeals = () => {
   )
 }
 
-export default FlashDeals 
+export default FlashDeals

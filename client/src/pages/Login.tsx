@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import { heroSectionData } from "../assets/assets"
 import { Link } from "react-router-dom"
 import { ShoppingCart, User, Mail, Lock, Loader2 } from 'lucide-react'
 import { useAuth } from "../context/AuthContext"
+import toast from "react-hot-toast"
 
 const Login = () => {
   const [isLoginState, setIsLoginState] = useState(true)
@@ -11,21 +12,20 @@ const Login = () => {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
 
-  const {login, register} = useAuth()
+  const { login, register } = useAuth()
 
-  const handleSubmit = async (e: React.SubmitEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true);
-    try{
-      if(isLoginState){
+    try {
+      if (isLoginState) {
         await login(email, password)
-      }else {
+      } else {
         await register(name, email, password)
       }
-
-    } catch(error: any){
-       toast.error(error.response?.data?.message || error?.message);
-    } finally{
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error?.message);
+    } finally {
       setLoading(false)
     }
   }
